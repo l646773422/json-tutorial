@@ -1,8 +1,11 @@
 #include "leptjson.h"
 #include <assert.h>  /* assert() */
 #include <stdlib.h>  /* NULL, strtod() */
+#include <string.h>
 
 #define EXPECT(c, ch)       do { assert(*c->json == (ch)); c->json++; } while(0)
+#define ISDIGIT(ch) ((ch) >= '0' && (ch) <= '9')
+#define ISDIGIT1TO9(ch) ((ch) >= '1' && (ch) <= '9')
 
 typedef struct {
     const char* json;
@@ -42,22 +45,70 @@ static int lept_parse_null(lept_context* c, lept_value* v) {
     return LEPT_PARSE_OK;
 }
 
+static int validate_number(lept_context* c, const char** end) 
+{
+    const char *p = c->json;
+    if(*p == '-') p++;
+    if(*p == '0') p++;
+    else
+    {
+        if(!ISDIGIT1TO9(*p)) return LEPT_PARSE_INVALID_VALUE;
+        while(ISDIGIT1TO9(*p)) p++;
+    }
+
+    if(*p == '.')
+    {
+        p++;
+        if(!ISDIGIT(*p)) return LEPT_PARSE_INVALID_VALUE;
+        while(ISDIGIT(*p)) p++;
+    }
+
+    if(*p == 'e' || *p == 'E')
+    {
+        p++;
+        if(*p == '+' || *p == '-') ++p;
+        if(!ISDIGIT(*p)) return LEPT_PARSE_INVALID_VALUE;
+        while(ISDIGIT(*p)) p++;
+    }
+    *end = p;
+    return LEPT_PARSE_OK;
+}
+
 static int lept_parse_number(lept_context* c, lept_value* v) {
-    char* end;
-    /* \TODO validate number */
-    v->n = strtod(c->json, &end);
-    if (c->json == end)
+    const char *p = NULL;
+    if(validate_number(c, &p) == LEPT_PARSE_INVALID_VALUE)
+    {
+        v->type = LEPT_NULL;
         return LEPT_PARSE_INVALID_VALUE;
-    c->json = end;
+    }
+
+    v->n = strtod(c->json, NULL);
+    
+    c->json = p;
     v->type = LEPT_NUMBER;
+    return LEPT_PARSE_OK;
+}
+
+static int lept_parse_prototype(lept_context* c, lept_value* v, char* value, lept_type type)
+{
+    int length = strlen(value);
+    int i;
+    /* pay attention. strcmp jump  */
+    for (i=0;i<length;i++)
+    {
+        if(value[i] != c->json[i])
+        return LEPT_PARSE_INVALID_VALUE;
+    }
+    c->json += length;
+    v->type = type;
     return LEPT_PARSE_OK;
 }
 
 static int lept_parse_value(lept_context* c, lept_value* v) {
     switch (*c->json) {
-        case 't':  return lept_parse_true(c, v);
-        case 'f':  return lept_parse_false(c, v);
-        case 'n':  return lept_parse_null(c, v);
+        case 't':  return lept_parse_prototype(c, v, "true", LEPT_TRUE);
+        case 'f':  return lept_parse_prototype(c, v, "false", LEPT_FALSE);
+        case 'n':  return lept_parse_prototype(c, v, "null", LEPT_NULL);
         default:   return lept_parse_number(c, v);
         case '\0': return LEPT_PARSE_EXPECT_VALUE;
     }

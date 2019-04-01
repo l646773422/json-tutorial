@@ -21,8 +21,11 @@ static int lept_parse_null(lept_context* c, lept_value* v) {
         return LEPT_PARSE_INVALID_VALUE;
     c->json += 3;
     v->type = LEPT_NULL;
+    /*
     lept_parse_whitespace(c);
     return (*c->json == 'n' || *c->json == 'f' || *c->json == 't'|| *c->json == '\0') ? LEPT_PARSE_OK : LEPT_PARSE_ROOT_NOT_SINGULAR;
+    */
+    return LEPT_PARSE_OK;
 }
 
 static int lept_parse_false(lept_context* c, lept_value* v) {
@@ -44,6 +47,7 @@ static int lept_parse_true(lept_context* c, lept_value* v) {
 }
 
 
+/* replace switch into hash table, maybe more effictive? */
 static int lept_parse_value(lept_context* c, lept_value* v) {
     switch (*c->json) {
         case 'n':  return lept_parse_null(c, v);
@@ -60,7 +64,16 @@ int lept_parse(lept_value* v, const char* json) {
     c.json = json;
     v->type = LEPT_NULL;
     lept_parse_whitespace(&c);
-    return lept_parse_value(&c, v);
+    int parse_result = lept_parse_value(&c, v);
+    if(parse_result == LEPT_PARSE_OK)
+    {
+        lept_parse_whitespace(&c);
+        if(*(c.json) == '\0')
+            return LEPT_PARSE_OK;
+        else
+            return LEPT_PARSE_ROOT_NOT_SINGULAR;
+    }
+    return parse_result;
 }
 
 lept_type lept_get_type(const lept_value* v) {
