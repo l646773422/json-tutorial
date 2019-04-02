@@ -73,6 +73,14 @@ static void test_parse_number() {
     TEST_NUMBER(5e-324, "5e-324");
     TEST_NUMBER(2e-53, "2e-53");
     TEST_NUMBER(1.234E10, "1.234E10");
+
+    TEST_NUMBER(1.0000000000000002, "1.0000000000000002");  /* smallest number */
+    TEST_NUMBER(1.0000000000000004, "1.0000000000000004");  /* a little big */
+    TEST_NUMBER(4.9406564584124654E-324, "4.9406564584124654E-324"); /* Min. subnormal positive double */
+    TEST_NUMBER(2.2250738585072009E-308, "2.2250738585072009E-308"); /* Max. subnormal double */
+    TEST_NUMBER(2.2250738585072014E-308, "2.2250738585072014E-308"); /* Min. normal double */
+    TEST_NUMBER(1.7976931348623157E308, "1.7976931348623157E308"); /* Max. double */
+
 }
 
 #define TEST_ERROR(error, json)\
