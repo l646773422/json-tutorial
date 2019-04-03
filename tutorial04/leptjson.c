@@ -17,6 +17,11 @@
 #define ISDIGIT(ch)         ((ch) >= '0' && (ch) <= '9')
 #define ISDIGIT1TO9(ch)     ((ch) >= '1' && (ch) <= '9')
 #define PUTC(c, ch)         do { *(char*)lept_context_push(c, sizeof(char)) = (ch); } while(0)
+#define ISHEX(ch)           (ISDIGIT(ch) || ((ch) >= 'A' && (ch) <= 'F') || ((ch) >= 'a' && (ch) <= 'f'))
+#define CHARTOINT(ch) ISDIGIT(ch) ? (ch) - '0' : ((ch) >= 'A' && (ch) <= 'F') ? (ch) - 'A' + 10 : (ch) - 'a' + 10
+#define GETPOSTBYTE(num, offset) (((num) >> offset) & 0xBF) | 0x80
+#define ISHIGHSURROGATE(num) (((num) >= 0xD800) && ((num) <= 0xDBFF))
+#define ISLOWSURROGATE(num) (((num) >= 0xDC00) && ((num) <= 0xDFFF))
 
 typedef struct {
     const char* json;
@@ -91,12 +96,86 @@ static int lept_parse_number(lept_context* c, lept_value* v) {
 }
 
 static const char* lept_parse_hex4(const char* p, unsigned* u) {
-    /* \TODO */
+    int i;
+    unsigned int temp = 0;
+    char ch;
+    for(i=0;i<4;i++)
+    {
+        ch = *(p+i);
+        temp = temp << 4;
+        if(! ISHEX(ch))  return NULL;
+        temp |= CHARTOINT(ch);
+        /* printf("*p: %d | temp: %d\n", CHARTOINT(ch), temp); */
+    }
+    *u = temp;
+    /* printf("\n"); */
+    return p+4;
+}
+
+static const char* lept_parse_next_hex4(const char* p, unsigned* u) {
+    assert(ISHIGHSURROGATE(*u));
+    if(!(*p == '\\' && *(p+1) == 'u'))
+        return NULL;
+    p += 2;
+    unsigned int low = 0;
+    /* printf("high: %#X, ", *u); */
+    if(!(p = lept_parse_hex4(p, &low)))
+    {
+        return NULL;
+    }
+    /* printf("low: %#X, ", low); */
+    if(! ISLOWSURROGATE(low))
+        return  NULL;
+    *u = 0x10000 + (*u - 0xD800) * 0x400 + (low - 0xDC00);
+    /* printf("result: %#X\n", *u); */
     return p;
 }
 
 static void lept_encode_utf8(lept_context* c, unsigned u) {
-    /* \TODO */
+    assert(u >= 0x0000 && u <= 0x10FFFF);
+    /* GETBITS(u, bits); */
+    /* printf("number: %d\t", u); */
+    if (u >= 0x0000 && u <= 0x007F)
+    {
+        PUTC(c, u & 0xFF);
+    } 
+    else if(u >= 0x0080 && u <= 0x07FF)
+    {
+        /* 11 bits for total */
+        char byte1, byte2;
+        byte1 = GETPOSTBYTE(u, 0);  /* bits distribution: 10xxxx */
+        byte2 = ((u >> 6) & 0xDF) | 0xC0;
+        /* printf("2 bytes: %#4X, %#4X\n", byte2, byte1); */
+        PUTC(c, byte2);
+        PUTC(c, byte1);
+    }
+    else if(u >= 0x0800 && u <= 0xFFFF)
+    {
+        /* 16 bits for total */
+        char byte1, byte2, byte3;
+        byte1 = GETPOSTBYTE(u, 0);
+        byte2 = GETPOSTBYTE(u, 6);
+        byte3 = ((u >> 12) & 0xEF) | 0xE0;
+        /* printf("3 bytes: %#4X, %#4X, %#4X\n", byte3, byte2, byte1); */
+        PUTC(c, byte3);
+        PUTC(c, byte2);
+        PUTC(c, byte1);
+    }
+    else if(u >= 0x10000 && u <= 0x10FFFF)
+    {
+        /* 21 bits for total */
+        char byte1, byte2, byte3, byte4;
+        byte1 = GETPOSTBYTE(u, 0);  
+        byte2 = GETPOSTBYTE(u, 6);  
+        byte3 = GETPOSTBYTE(u, 12); 
+        byte4 = ((u >> 18) & 0xF7) | 0xF0;
+        /* printf("3 bytes: %#4X, %#4X, %#4X, %#4X\n", byte4, byte3, byte2, byte1); */
+        PUTC(c, byte4);
+        PUTC(c, byte3);
+        PUTC(c, byte2);
+        PUTC(c, byte1);
+    }
+    
 }
 
 #define STRING_ERROR(ret) do { c->top = head; return ret; } while(0)
@@ -128,7 +207,11 @@ static int lept_parse_string(lept_context* c, lept_value* v) {
                     case 'u':
                         if (!(p = lept_parse_hex4(p, &u)))
                             STRING_ERROR(LEPT_PARSE_INVALID_UNICODE_HEX);
-                        /* \TODO surrogate handling */
+                        if(ISHIGHSURROGATE(u))
+                        {
+                            if(!(p = lept_parse_next_hex4(p, &u)))
+                                STRING_ERROR(LEPT_PARSE_INVALID_UNICODE_SURROGATE);
+                        }
                         lept_encode_utf8(c, u);
                         break;
                     default:

@@ -102,6 +102,12 @@ static int lept_parse_string(lept_context* c, lept_value* v) {
         switch (ch) {
             case '\"':
                 /* PUTALL(c, p-counter, counter); */
+                /* 
+                The reason we need stack is because we should handle escape character.
+                For eg. json string -> hello\tworld. when we read into memory it will be interrpreted as "hello\\tworld"
+                but, we acctually want, is "hello\tworld".
+                So, if no escape character in json string, all stack operations are in vain.
+                */
                 len = c->top - head;
                 lept_set_string(v, (const char*)lept_context_pop(c, len), len);
                 c->json = p;
