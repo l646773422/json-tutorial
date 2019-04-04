@@ -129,14 +129,35 @@ static void test_parse_string() {
 
 static void test_parse_array() {
     lept_value v;
+    lept_value tmp;
 
     lept_init(&v);
-    EXPECT_EQ_INT(LEPT_PARSE_OK, lept_parse(&v, "[1, 2, \"abc\", [1, \"a\"]]"));
+    EXPECT_EQ_INT(LEPT_PARSE_OK, lept_parse(&v, "[1.2, 2.0, \"abc\", [11.0, \"a\"]]"));
     EXPECT_EQ_INT(LEPT_ARRAY, lept_get_type(&v));
-    EXPECT_EQ_SIZE_T(0, lept_get_array_size(&v));
+    EXPECT_EQ_SIZE_T(4, lept_get_array_size(&v));
+
+    tmp = v.u.a.e[0];
+    EXPECT_EQ_INT(LEPT_NUMBER, lept_get_type(&tmp));
+    EXPECT_EQ_DOUBLE(1.2, lept_get_number(&tmp));
+
+    tmp = v.u.a.e[1];
+    EXPECT_EQ_INT(LEPT_NUMBER, lept_get_type(&tmp));
+    EXPECT_EQ_DOUBLE(2.0, lept_get_number(&tmp));
+
+    tmp = v.u.a.e[2];
+    EXPECT_EQ_INT(LEPT_STRING, lept_get_type(&tmp));
+    EXPECT_EQ_STRING("abc", lept_get_string(&tmp), 3);
     
-    EXPECT_EQ_INT(LEPT_NUMBER, lept_get_type(v.u.a.e));
-    EXPECT_EQ_SIZE_T(0, lept_get_array_size(&v));
+    EXPECT_EQ_INT(LEPT_ARRAY, lept_get_type(&v.u.a.e[3]));
+    EXPECT_EQ_SIZE_T(2, lept_get_array_size(&v.u.a.e[3]));
+
+    tmp = v.u.a.e[3].u.a.e[0];
+    EXPECT_EQ_INT(LEPT_NUMBER, lept_get_type(&tmp));
+    EXPECT_EQ_DOUBLE(11.0, lept_get_number(&tmp));
+
+    tmp = v.u.a.e[3].u.a.e[1];
+    EXPECT_EQ_INT(LEPT_STRING, lept_get_type(&tmp));
+    EXPECT_EQ_STRING("a", lept_get_string(&tmp), 1);
 
     lept_free(&v);
 }
@@ -306,11 +327,6 @@ static void test_access() {
     test_access_string();
 }
 
-void GetMemory(char *p, int num)
-{
-  p = (char*)malloc(sizeof(char) * num);
-}
-
 int main() {
 #ifdef _WINDOWS
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_CHECK_ALWAYS_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -318,9 +334,6 @@ int main() {
     test_parse();
     test_access();
     printf("%d/%d (%3.2f%%) passed\n", test_pass, test_count, test_pass * 100.0 / test_count);
-    char *str = NULL;
-    GetMemory(str, 100);
-    _CrtDumpMemoryLeaks();
 
     return main_ret;
 }

@@ -54,9 +54,11 @@ static void lept_parse_whitespace(lept_context* c) {
 static int lept_parse_literal(lept_context* c, lept_value* v, const char* literal, lept_type type) {
     size_t i;
     EXPECT(c, literal[0]);
-    for (i = 0; literal[i + 1]; i++)
-        if (c->json[i] != literal[i + 1])
-            return LEPT_PARSE_INVALID_VALUE;
+    for (i = 0; i < strlen(literal); i++)
+    {
+      if (c->json[i] != literal[i + 1])
+        return LEPT_PARSE_INVALID_VALUE;
+    }
     c->json += i;
     v->type = type;
     return LEPT_PARSE_OK;
@@ -201,11 +203,17 @@ static int lept_parse_array(lept_context* c, lept_value* v) {
         lept_parse_whitespace(c);
         if ((ret = lept_parse_value(c, &e)) != LEPT_PARSE_OK)
         {
+          int i;
           lept_context_pop(c, c->top);
+          for (i = 0; i < size; i++)
+          {
+            lept_free(((lept_value*)c->stack) + i);
+          }
           return ret;
         }
         memcpy(lept_context_push(c, sizeof(lept_value)), &e, sizeof(lept_value));
         size++;
+        lept_parse_whitespace(c);
         /* When find a ',' means at least one element left. So, parse will continue */
         if (*c->json == ',')
           c->json++;
@@ -220,6 +228,7 @@ static int lept_parse_array(lept_context* c, lept_value* v) {
         else
         {
           lept_context_pop(c, c->top);
+          lept_free(v);
           return LEPT_PARSE_MISS_COMMA_OR_SQUARE_BRACKET;
         }
     }
@@ -262,6 +271,20 @@ void lept_free(lept_value* v) {
     assert(v != NULL);
     if (v->type == LEPT_STRING)
         free(v->u.s.s);
+    if (v->type == LEPT_ARRAY)
+    {
+        int i;
+        lept_value tmp;
+
+        /* free element. */
+        for (i = 0; i < v->u.a.size; i++)
+        {
+            tmp = v->u.a.e[i];
+            lept_free(&tmp);
+        }
+        /*Be cafeful! The memory of array needs free too!*/
+        free(v->u.a.e);
+    }
     v->type = LEPT_NULL;
 }
 
