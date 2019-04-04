@@ -131,9 +131,13 @@ static void test_parse_array() {
     lept_value v;
 
     lept_init(&v);
-    EXPECT_EQ_INT(LEPT_PARSE_OK, lept_parse(&v, "[ ]"));
+    EXPECT_EQ_INT(LEPT_PARSE_OK, lept_parse(&v, "[1, 2, \"abc\", [1, \"a\"]]"));
     EXPECT_EQ_INT(LEPT_ARRAY, lept_get_type(&v));
     EXPECT_EQ_SIZE_T(0, lept_get_array_size(&v));
+    
+    EXPECT_EQ_INT(LEPT_NUMBER, lept_get_type(v.u.a.e));
+    EXPECT_EQ_SIZE_T(0, lept_get_array_size(&v));
+
     lept_free(&v);
 }
 
@@ -167,7 +171,7 @@ static void test_parse_invalid_value() {
     TEST_ERROR(LEPT_PARSE_INVALID_VALUE, "nan");
 
     /* invalid value in array */
-#if 0
+#if 1
     TEST_ERROR(LEPT_PARSE_INVALID_VALUE, "[1,]");
     TEST_ERROR(LEPT_PARSE_INVALID_VALUE, "[\"a\", nul]");
 #endif
@@ -229,7 +233,7 @@ static void test_parse_invalid_unicode_surrogate() {
 }
 
 static void test_parse_miss_comma_or_square_bracket() {
-#if 0
+#if 1
     TEST_ERROR(LEPT_PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[1");
     TEST_ERROR(LEPT_PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[1}");
     TEST_ERROR(LEPT_PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[1 2");
@@ -302,12 +306,21 @@ static void test_access() {
     test_access_string();
 }
 
+void GetMemory(char *p, int num)
+{
+  p = (char*)malloc(sizeof(char) * num);
+}
+
 int main() {
 #ifdef _WINDOWS
-    _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+    _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_CHECK_ALWAYS_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
     test_parse();
     test_access();
     printf("%d/%d (%3.2f%%) passed\n", test_pass, test_count, test_pass * 100.0 / test_count);
+    char *str = NULL;
+    GetMemory(str, 100);
+    _CrtDumpMemoryLeaks();
+
     return main_ret;
 }

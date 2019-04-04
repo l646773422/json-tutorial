@@ -187,6 +187,7 @@ static int lept_parse_array(lept_context* c, lept_value* v) {
     size_t size = 0;
     int ret;
     EXPECT(c, '[');
+    lept_parse_whitespace(c);
     if (*c->json == ']') {
         c->json++;
         v->type = LEPT_ARRAY;
@@ -197,12 +198,17 @@ static int lept_parse_array(lept_context* c, lept_value* v) {
     for (;;) {
         lept_value e;
         lept_init(&e);
+        lept_parse_whitespace(c);
         if ((ret = lept_parse_value(c, &e)) != LEPT_PARSE_OK)
-            return ret;
+        {
+          lept_context_pop(c, c->top);
+          return ret;
+        }
         memcpy(lept_context_push(c, sizeof(lept_value)), &e, sizeof(lept_value));
         size++;
+        /* When find a ',' means at least one element left. So, parse will continue */
         if (*c->json == ',')
-            c->json++;
+          c->json++;
         else if (*c->json == ']') {
             c->json++;
             v->type = LEPT_ARRAY;
@@ -212,7 +218,10 @@ static int lept_parse_array(lept_context* c, lept_value* v) {
             return LEPT_PARSE_OK;
         }
         else
-            return LEPT_PARSE_MISS_COMMA_OR_SQUARE_BRACKET;
+        {
+          lept_context_pop(c, c->top);
+          return LEPT_PARSE_MISS_COMMA_OR_SQUARE_BRACKET;
+        }
     }
 }
 
